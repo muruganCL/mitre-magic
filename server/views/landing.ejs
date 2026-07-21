@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Home · Mitre Agent</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">Mitre Agent</div>
+    <div class="right">
+      <span class="badge"><%= user.role %></span>
+      <form class="inline" method="POST" action="/logout">
+        <button class="btn btn-ghost" type="submit">Log out</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="page">
+    <h1>Welcome, <%= user.username %></h1>
+    <p class="lead">You're signed in. This is your landing page.</p>
+
+    <div class="card">
+      <p style="margin:0; color: var(--text-dim);">Job status and results will appear here once the LangGraph pipeline is connected.</p>
+    </div>
+  </div>
+</body>
+</html>

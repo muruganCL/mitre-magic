@@ -1,0 +1,16 @@
+services:
+  mitre-postgres:
+    image: postgres:16-alpine
+    container_name: mitre-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mitre_admin
+      POSTGRES_PASSWORD: mitre_password
+      POSTGRES_DB: mitre_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - mitre-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  mitre-postgres-data:

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in · Mitre Agent</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <h1>Mitre Agent</h1>
+      <p class="subtitle">Sign in to continue</p>
+
+      <% if (error) { %>
+        <div class="error-banner"><%= error %></div>
+      <% } %>
+
+      <form method="POST" action="/login">
+        <div class="field">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" autocomplete="username" required autofocus />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn" type="submit">Sign in</button>
+      </form>
+
+      <p class="hint">Demo accounts: demo / demo1234 &middot; admin / admin1234</p>
+    </div>
+  </div>
+</body>
+</html>
