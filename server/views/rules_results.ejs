@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Results · Mitre Agent</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="/rules/upload">Mitre Agent</a>
+    <div class="right">
+      <span class="badge"><%= user.role %></span>
+      <a href="/rules/upload" class="btn btn-ghost" style="width: auto; text-decoration: none; display: inline-block;">Back to Upload</a>
+      <form class="inline" method="POST" action="/logout">
+        <button class="btn btn-ghost" type="submit">Log out</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="page" style="max-width: 1100px;">
+    <h1>Technique Mapping Results</h1>
+    <p class="lead"><%= job.filename %> &middot; <%= job.total_rows %> rules processed</p>
+
+    <h2 class="section-title">Pipeline Inspector</h2>
+    <div class="card">
+      <div class="field" style="max-width: 480px;">
+        <label for="rule-select">Inspect rule</label>
+        <select id="rule-select"></select>
+      </div>
+      <div id="pipeline-inspector"></div>
+    </div>
+
+    <h2 class="section-title">Rule &rarr; Analytic &rarr; Technique</h2>
+    <div class="card table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th>Verdict</th>
+            <th>Matched Analytic</th>
+            <th>Technique</th>
+            <th>Platforms</th>
+            <th>Structural</th>
+            <th>LLM Confidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% let lastRuleId = null; %>
+          <% rows.forEach(function(row) { %>
+            <% const isFirstInGroup = row.rule_id !== lastRuleId; %>
+            <tr class="<%= isFirstInGroup ? 'rule-group-start' : '' %>">
+              <td>
+                <% if (isFirstInGroup) { %>
+                  <strong><%= row.rule_name %></strong>
+                <% } %>
+              </td>
+              <% lastRuleId = row.rule_id; %>
+              <% if (row.technique_id) { %>
+                <td>
+                  <% if (row.llm_selected) { %>
+                    <span class="state-badge state-covered">LLM Pick</span>
+                  <% } else if (row.needs_review) { %>
+                    <span class="state-badge state-partial">Needs Review</span>
+                  <% } else { %>
+                    <span class="dim">Candidate</span>
+                  <% } %>
+                </td>
+                <td><%= row.analytic_name %> <span class="dim">(<%= row.analytic_id %>)</span></td>
+                <td><%= row.technique_name %> <span class="dim">(<%= row.technique_id %>)</span></td>
+                <td><%= (row.matched_platforms || []).join(', ') %><% if (row.platform_inferred) { %> <span class="dim">(inferred)</span><% } %></td>
+                <td><%= row.score ? Math.round(row.score * 100) + '%' : '' %></td>
+                <td>
+                  <% if (row.llm_confidence !== null) { %>
+                    <%= Math.round(row.llm_confidence * 100) + '%' %>
+                    <% if (row.llm_rationale) { %><div class="dim" style="margin-top:2px; max-width: 280px;"><%= row.llm_rationale %></div><% } %>
+                  <% } %>
+                </td>
+              <% } else { %>
+                <td class="dim" colspan="6">No technique match found for this rule's query.</td>
+              <% } %>
+            </tr>
+            <% if (isFirstInGroup && row.needs_review && row.review_reason) { %>
+              <tr>
+                <td></td>
+                <td class="dim" colspan="6">
+                  <div style="width: 640px; max-width: 60vw; white-space: normal; word-wrap: break-word;">
+                    <em>Review note:</em> <%= row.review_reason %>
+                  </div>
+                </td>
+              </tr>
+            <% } %>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="section-title">Coverage Summary</h2>
+    <p class="lead" style="margin-bottom: 4px; font-size: 13px;">
+      In-scope platforms for this upload: <%= coverage.customerPlatforms.length ? coverage.customerPlatforms.join(', ') : '(none declared)' %>
+    </p>
+    <p class="lead" style="margin-bottom: 12px; font-size: 12px;">
+      Based only on techniques the LLM confirmed from the rule's actual query logic ("LLM Pick" above) -- unconfirmed candidates don't count toward coverage.
+    </p>
+    <div class="card table-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Technique</th>
+            <th>Status</th>
+            <th>Matched Platforms</th>
+            <th>Eligible Platforms</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (coverage.techniques.length === 0) { %>
+            <tr><td class="dim" colspan="4">No techniques matched in this upload.</td></tr>
+          <% } %>
+          <% coverage.techniques.forEach(function(t) { %>
+            <tr>
+              <td><%= t.techniqueName %> <span class="dim">(<%= t.techniqueId %>)</span></td>
+              <td><span class="state-badge state-<%= t.state.toLowerCase() %>"><%= t.state %></span></td>
+              <td><%= t.matchedPlatforms.join(', ') %></td>
+              <td><%= t.eligiblePlatforms.join(', ') %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    window.PIPELINES = <%- JSON.stringify(pipelines) %>;
+  </script>
+  <script src="/js/pipeline-inspector.js"></script>
+</body>
+</html>

@@ -6,14 +6,17 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "ingest:mitre": "node src/mitre/ingest.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "csv-parse": "^5.5.6",
     "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
+    "multer": "^2.0.0",
     "pg": "^8.12.0"
   }
 }

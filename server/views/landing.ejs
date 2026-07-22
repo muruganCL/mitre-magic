@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Home · Mitre Agent</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Mitre Agent</div>
+    <a class="brand" href="/rules/upload">Mitre Agent</a>
     <div class="right">
       <span class="badge"><%= user.role %></span>
       <form class="inline" method="POST" action="/logout">
@@ -22,7 +23,11 @@
     <p class="lead">You're signed in. This is your landing page.</p>
 
     <div class="card">
-      <p style="margin:0; color: var(--text-dim);">Job status and results will appear here once the LangGraph pipeline is connected.</p>
+      <h3 style="margin-top:0; color: var(--accent); font-size: 14px;">Detection rule coverage</h3>
+      <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 16px;">
+        Upload a CSV of your SIEM detection rules to map them to ATT&amp;CK techniques and see your coverage.
+      </p>
+      <a class="btn" style="display:inline-block; width:auto; padding: 10px 20px; text-decoration:none;" href="/rules/upload">Upload Rules CSV</a>
     </div>
   </div>
 </body>

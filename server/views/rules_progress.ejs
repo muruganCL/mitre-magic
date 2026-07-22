@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Processing · Mitre Agent</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="/rules/upload">Mitre Agent</a>
+    <div class="right">
+      <span class="badge"><%= user.role %></span>
+      <a href="/rules/upload" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">Back to Upload</a>
+      <form class="inline" method="POST" action="/logout">
+        <button class="btn btn-ghost" type="submit">Log out</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="page" style="max-width: 640px;">
+    <h1>Analyzing rules</h1>
+    <p class="lead"><%= job.filename %></p>
+
+    <div class="card">
+      <div class="progress-row">
+        <span id="progress-label">Matching rules against ATT&amp;CK analytics&hellip;</span>
+        <span id="progress-pct" class="progress-pct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <p id="progress-count" class="progress-count">0 / <%= job.total_rows %> rules</p>
+    </div>
+  </div>
+
+  <script>
+    window.JOB_ID = <%- JSON.stringify(job.id) %>;
+    window.JOB_STATUS = <%- JSON.stringify(job.status) %>;
+  </script>
+  <script src="/js/rules-progress.js"></script>
+</body>
+</html>
