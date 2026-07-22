@@ -46,6 +46,9 @@ ALTER TABLE rule_technique_matches ADD COLUMN IF NOT EXISTS llm_rationale TEXT;
 ALTER TABLE rule_technique_matches ADD COLUMN IF NOT EXISTS llm_selected BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE rule_technique_matches ADD COLUMN IF NOT EXISTS needs_review BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE rule_technique_matches ADD COLUMN IF NOT EXISTS review_reason TEXT;
+-- Marks a mapping the LLM proposed from its own ATT&CK knowledge (structural retrieval missed
+-- it). The technique id was still validated against the ATT&CK database before being stored.
+ALTER TABLE rule_technique_matches ADD COLUMN IF NOT EXISTS llm_proposed BOOLEAN NOT NULL DEFAULT false;
 
 -- Snapshot of every pipeline stage's output for this rule (detected query language, extracted
 -- tokens, raw per-signal search results, ranked candidates, and the LLM request/response) --

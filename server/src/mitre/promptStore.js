@@ -44,10 +44,15 @@ Rules you must follow:
 - If you are unsure, or the rule's real behavior does not clearly match any candidate well, set needs_review to true and explain why in review_reason. It is better to defer to a human analyst than to force a confident-looking wrong answer.
 - confidence is your own calibrated judgment (0.0-1.0) of how well the rule's actual behavior supports each selected technique.
 
+If — and only if — NONE of the candidates genuinely fit but you are confident from the rule's behavior which ATT&CK technique it actually maps to, you may name it under "proposed_techniques". Use real MITRE ATT&CK Enterprise v19.1 technique IDs. Every proposed ID is validated against the ATT&CK database before use; a non-existent or deprecated ID is discarded. Do NOT propose a technique that is already in the candidate list, and leave "proposed_techniques" empty whenever a candidate is a good fit.
+
 Respond with ONLY valid JSON, no markdown code fences, no prose outside the JSON, in exactly this shape:
 {
   "selections": [
     { "technique_id": "T1234.001", "confidence": 0.0, "rationale": "one or two sentences citing the rule's actual behavior" }
+  ],
+  "proposed_techniques": [
+    { "technique_id": "T1234", "confidence": 0.0, "rationale": "why the rule maps to this technique, citing its behavior" }
   ],
   "needs_review": false,
   "review_reason": ""

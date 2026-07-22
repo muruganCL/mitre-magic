@@ -54,7 +54,7 @@
                   <span class="state-badge state-partial">Needs review</span>
                 <% } else { %>
                   <% m.selections.forEach(function(s) { %>
-                    <div class="map-line"><%= s.techniqueName %> <span class="dim">(<%= s.techniqueId %>)</span><% if (s.confidence !== null && s.confidence !== undefined) { %> <span class="dim">· <%= Math.round(s.confidence * 100) %>%</span><% } %></div>
+                    <div class="map-line"><%= s.techniqueName %> <span class="dim">(<%= s.techniqueId %>)</span><% if (s.confidence !== null && s.confidence !== undefined) { %> <span class="dim">· <%= Math.round(s.confidence * 100) %>%</span><% } %><% if (s.proposed) { %> <span class="state-badge state-partial" style="font-size:9.5px; padding:2px 7px;">LLM-proposed</span><% } %></div>
                   <% }); %>
                 <% } %>
               </td>

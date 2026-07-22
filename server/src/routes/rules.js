@@ -130,7 +130,7 @@ router.get('/rules/upload/:jobId/results', requireAuth, async (req, res) => {
   const { rows: finalRaw } = await pool.query(
     `SELECT r.id AS rule_id, r.rule_name, r.description, r.qa_result,
             rtm.technique_id, t.name AS technique_name, rtm.analytic_id, a.name AS analytic_name,
-            rtm.llm_confidence, rtm.needs_review
+            rtm.llm_confidence, rtm.needs_review, rtm.llm_proposed
      FROM rules r
      LEFT JOIN rule_technique_matches rtm ON rtm.rule_id = r.id AND rtm.llm_selected = true
      LEFT JOIN mitre_techniques t ON t.id = rtm.technique_id
@@ -158,6 +158,7 @@ router.get('/rules/upload/:jobId/results', requireAuth, async (req, res) => {
         analyticId: row.analytic_id,
         analyticName: row.analytic_name,
         confidence: row.llm_confidence,
+        proposed: row.llm_proposed,
       });
     }
   }

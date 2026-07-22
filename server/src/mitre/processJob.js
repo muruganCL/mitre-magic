@@ -139,20 +139,74 @@ async function processJob(jobId) {
         );
       }
 
+      // LLM-proposed techniques (structural retrieval missed them). Validate each id against the
+      // ATT&CK database -- only a real, non-deprecated technique is accepted -- then attach the
+      // best representative analytic (preferring one whose platform matches the rule) so the
+      // output still carries a real analytic id. Stored flagged llm_proposed + needs_review.
+      const candidateIds = new Set(candidates.map(([tid]) => tid));
+      const rulePlatforms = rule.applicable_platforms || [];
+      for (const prop of verdict.proposed || []) {
+        if (candidateIds.has(prop.technique_id)) continue;
+        const { rows: techRows } = await pool.query(
+          'SELECT id, name FROM mitre_techniques WHERE id=$1 AND revoked=false AND deprecated=false',
+          [prop.technique_id]
+        );
+        if (techRows.length === 0) continue; // hallucinated / deprecated id -> discard
+        const { rows: analyticRows } = await pool.query(
+          `SELECT a.id AS analytic_id, a.platforms, als.log_source_name
+           FROM mitre_detects d
+           JOIN mitre_detection_strategy_analytics dsa ON dsa.detection_strategy_id = d.detection_strategy_id
+           JOIN mitre_analytics a ON a.id = dsa.analytic_id
+           JOIN mitre_analytic_log_sources als ON als.analytic_id = a.id
+           WHERE d.technique_id = $1
+           ORDER BY (cardinality($2::text[]) > 0 AND a.platforms && $2::text[]) DESC
+           LIMIT 1`,
+          [prop.technique_id, rulePlatforms]
+        );
+        const rep = analyticRows[0] || {};
+        const matchedPlatforms = rep.platforms ? rep.platforms.filter((p) => rulePlatforms.includes(p)) : [];
+        await pool.query(
+          `INSERT INTO rule_technique_matches
+             (rule_id, analytic_id, technique_id, matched_platforms, matched_log_source, score, platform_inferred,
+              llm_confidence, llm_rationale, llm_selected, needs_review, review_reason, llm_proposed)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,true,$10,true)`,
+          [
+            rule.id,
+            rep.analytic_id || null,
+            prop.technique_id,
+            matchedPlatforms,
+            rep.log_source_name || '(LLM-proposed — not from structural search)',
+            null,
+            false,
+            prop.confidence,
+            prop.rationale,
+            'Technique proposed by the LLM (not surfaced by structural search) — validated against ATT&CK and flagged for review.',
+          ]
+        );
+      }
+
       // QA agent: independent check of the final mapping against the source rule. Runs even
       // when nothing was selected (it confirms the needs_review path was taken correctly).
       let qaResult = null;
       try {
-        const qaSelections = verdict.selections.map((s) => {
-          const entry = byTechnique.get(s.technique_id);
-          return {
-            technique_id: s.technique_id,
-            technique_name: entry ? entry.techniqueName : undefined,
-            analytic_id: entry ? entry.bestAnalytic : undefined,
-            confidence: s.confidence,
-            rationale: s.rationale,
-          };
-        });
+        const qaSelections = [
+          ...verdict.selections.map((s) => {
+            const entry = byTechnique.get(s.technique_id);
+            return {
+              technique_id: s.technique_id,
+              technique_name: entry ? entry.techniqueName : undefined,
+              analytic_id: entry ? entry.bestAnalytic : undefined,
+              confidence: s.confidence,
+              rationale: s.rationale,
+            };
+          }),
+          ...(verdict.proposed || []).map((p) => ({
+            technique_id: p.technique_id,
+            confidence: p.confidence,
+            rationale: p.rationale,
+            proposed: true,
+          })),
+        ];
         qaResult = await runQa(rule, llmProfile, qaSelections);
       } catch (qaErr) {
         qaResult = { checks: [], overall: 'error', error: qaErr.message };

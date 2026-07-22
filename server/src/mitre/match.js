@@ -221,7 +221,7 @@ async function searchForToken(tok, ruleText, platforms) {
   if (tok.type === 'artifact') return searchByArtifactToken(tok.value, ruleText, platforms);
   // Seen and recorded for the audit trail, but no searchable log source: unmapped CrowdStrike
   // events, filter/allow-list macros, and macros whose name gave no inference.
-  if (tok.type === 'concept-unknown' || tok.type === 'macro-filter' || tok.type === 'macro-unknown') return [];
+  if (tok.type === 'concept-unknown' || tok.type === 'macro-filter' || tok.type === 'macro-unknown' || tok.type === 'repo-unknown') return [];
   return searchBySourceToken(tok.value, ruleText, platforms);
 }
 

@@ -132,11 +132,18 @@ async function reasonAboutRule(rule, candidates, profile) {
   const selections = (parsed.selections || []).filter(
     (s) => s && typeof s.technique_id === 'string' && validIds.has(s.technique_id)
   );
+  // Techniques the LLM proposed beyond the candidate list (retrieval missed them). These are
+  // NOT trusted yet -- processJob validates every id against the ATT&CK database before use, so
+  // a hallucinated or deprecated id can never reach the output.
+  const proposed = (parsed.proposed_techniques || []).filter(
+    (s) => s && typeof s.technique_id === 'string' && !validIds.has(s.technique_id)
+  );
 
   return {
     selections,
-    needsReview: !!parsed.needs_review || selections.length === 0,
-    reviewReason: parsed.review_reason || (selections.length === 0 ? 'LLM found no candidate genuinely matched the rule logic.' : ''),
+    proposed,
+    needsReview: !!parsed.needs_review || (selections.length === 0 && proposed.length === 0),
+    reviewReason: parsed.review_reason || (selections.length === 0 && proposed.length === 0 ? 'LLM found no candidate genuinely matched the rule logic.' : ''),
   };
 }
 

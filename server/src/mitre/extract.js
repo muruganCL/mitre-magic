@@ -70,6 +70,18 @@ const MACRO_INFERENCE = [
 // were seen (for the audit trail) but derive no search signal from them.
 const FILTER_MACRO_RE = /(_filter|_whitelist|_allowlist|_exclusion|_exclude|_drop|_suppress|_tune)$/i;
 
+// CrowdStrike NGSIEM / LogScale queries name their data source with `#repo=<name>` instead of a
+// Splunk sourcetype or a Falcon event_simpleName. The repo name denotes the telemetry class, so
+// infer the matching MITRE data component and record it as a labelled assumption.
+const REPO_INFERENCE = [
+  { re: /vpc[_-]?flow|flow[_-]?log|netflow|traffic[_-]?flow/i, concept: 'Network Traffic Flow', note: 'repo holds network flow records' },
+  { re: /dns/i, concept: 'Active DNS', note: 'repo holds DNS query logs' },
+  { re: /proxy|http[_-]?log|web[_-]?(proxy|log)|url/i, concept: 'Network Traffic Content', note: 'repo holds web/proxy traffic content' },
+  { re: /(^|[_-])(auth|logon|signin|sign_in)([_-]|$)/i, concept: 'User Account Authentication', note: 'repo holds authentication logs' },
+  { re: /process|edr|endpoint|proc[_-]?exec/i, concept: 'Process Creation', note: 'repo holds endpoint process telemetry' },
+  { re: /(^|[_-])(net|network)[_-]?conn/i, concept: 'Network Connection Creation', note: 'repo holds network connection records' },
+];
+
 // Scripted (deterministic) extraction of log-source signals from a raw query. Runs before
 // any fuzzy/semantic matching -- it's the highest-precision signal. Handles both Splunk SPL
 // and CrowdStrike CQL/Falcon Event Search syntax. Every emitted signal carries provenance:
@@ -120,6 +132,29 @@ function extractTokens(query) {
     const value = m[1];
     const dataset = m[2] && m[2].toLowerCase() !== value.toLowerCase() ? m[2].replace(/_/g, ' ') : null;
     tokens.set(`datamodel:${value.toLowerCase()}`, { type: 'datamodel', value, dataset, method: 'regex', evidence: m[0].trim() });
+  }
+
+  // CrowdStrike NGSIEM / LogScale: `#repo=<name>` names the data source. Infer the matching
+  // MITRE data component from the repo name and record the translation as an assumption.
+  const repoRe = /#?repo\s*=\s*"?([\w:\-]+)"?/gi;
+  while ((m = repoRe.exec(query))) {
+    const raw = m[1];
+    const evidence = m[0].trim();
+    const inferred = REPO_INFERENCE.find((ri) => ri.re.test(raw));
+    if (inferred) {
+      tokens.set(`concept:${inferred.concept.toLowerCase()}`, {
+        type: 'concept',
+        value: inferred.concept,
+        method: 'inference',
+        evidence,
+        assumption: `LogScale repo "${raw}" → MITRE data component "${inferred.concept}" (${inferred.note})`,
+      });
+    } else {
+      tokens.set(`repo-unknown:${raw.toLowerCase()}`, {
+        type: 'repo-unknown', value: raw, method: 'regex', evidence,
+        assumption: 'Repo not mapped to a known telemetry category — relying on profile telemetry',
+      });
+    }
   }
 
   // CrowdStrike Falcon/CQL event_simpleName is the closest analogue to Splunk's EventCode --
