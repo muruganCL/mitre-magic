@@ -68,6 +68,18 @@ function extractTokens(query) {
     tokens.set(`eventcode:${value}`, { type: 'eventcode', value });
   }
 
+  // Splunk commonly filters on a SET of event codes: `EventCode IN (4728, 4729, 4732)`. The
+  // plain "EventCode=NNNN" regex above misses this entirely (which dropped the 4728 anchor on
+  // a real AD rule and let the search wander off-platform). Capture the parenthesized list and
+  // emit one event-code token per number inside it.
+  const eventCodeInRe = /(EventCode|EventID)\s+IN\s*\(([^)]*)\)/gi;
+  while ((m = eventCodeInRe.exec(query))) {
+    const nums = m[2].match(/\d+/g) || [];
+    for (const value of nums) {
+      tokens.set(`eventcode:${value}`, { type: 'eventcode', value });
+    }
+  }
+
   // Splunk CIM/data-model searches don't reference a raw sourcetype/index/EventCode at all --
   // the data model name itself ("Authentication") is the log-source signal, and maps
   // reasonably well onto MITRE data component names (e.g. "User Account Authentication").

@@ -2,21 +2,29 @@ const { pool } = require('../db');
 const { matchRule } = require('./match');
 const { extractProfile, reasonAboutRule } = require('./llm');
 
-// Aggregate raw (analytic, technique) matches for one rule up to one row per technique:
-// the best-scoring analytic, and the union of platforms that evidence actually covers.
+// Aggregate raw (analytic, technique) matches for one rule up to one row per technique.
+// bestScore is the technique's top score (drives candidate ranking); the REPRESENTATIVE
+// analytic shown as evidence is chosen preferring datasource-consistency first, then score --
+// so a Windows rule never displays a macOS analytic as the evidence for a technique that also
+// has a Windows analytic. (The datasource filter already drops the inconsistent ones per
+// technique, but this keeps representative selection correct even if both slip through.)
 function aggregateByTechnique(rawMatches, rulePlatforms) {
   const byTechnique = new Map();
+  const rulePlatformSet = new Set(rulePlatforms);
 
   for (const m of rawMatches) {
-    const intersect = m.platforms.filter((p) => rulePlatforms.includes(p));
+    const intersect = m.platforms.filter((p) => rulePlatformSet.has(p));
     const effectivePlatforms = intersect.length ? intersect : m.platforms;
     const inferred = intersect.length === 0 && m.platforms.length > 0;
+    const consistent = rulePlatformSet.size === 0 || intersect.length > 0;
 
     if (!byTechnique.has(m.technique_id)) {
       byTechnique.set(m.technique_id, {
         techniqueName: m.technique_name,
         platforms: new Set(),
         bestScore: 0,
+        repScore: -1,
+        repConsistent: false,
         bestAnalytic: null,
         bestAnalyticName: null,
         bestLogSource: null,
@@ -25,8 +33,18 @@ function aggregateByTechnique(rawMatches, rulePlatforms) {
     }
     const entry = byTechnique.get(m.technique_id);
     for (const p of effectivePlatforms) entry.platforms.add(p);
-    if (m.sim > entry.bestScore) {
-      entry.bestScore = m.sim;
+
+    entry.bestScore = Math.max(entry.bestScore, m.sim);
+
+    // Representative preference: a consistent analytic always beats an inconsistent one;
+    // within the same consistency, higher score wins.
+    const better =
+      entry.bestAnalytic === null ||
+      (consistent && !entry.repConsistent) ||
+      (consistent === entry.repConsistent && m.sim > entry.repScore);
+    if (better) {
+      entry.repConsistent = consistent;
+      entry.repScore = m.sim;
       entry.bestAnalytic = m.analytic_id;
       entry.bestAnalyticName = m.analytic_name;
       entry.bestLogSource = m.matched_log_source;
