@@ -126,6 +126,112 @@ a {
   margin-bottom: 16px;
 }
 
+.ok-banner {
+  background: rgba(57, 255, 136, 0.1);
+  border: 1px solid var(--accent-dim);
+  color: var(--accent);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* --- Admin shell with left nav --- */
+.admin-shell {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 40px 28px;
+}
+.admin-nav {
+  flex: none;
+  width: 210px;
+  position: sticky;
+  top: 24px;
+}
+.admin-nav-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+  padding: 0 12px 10px;
+}
+.admin-nav nav { display: flex; flex-direction: column; gap: 2px; }
+.admin-nav-item {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+a.admin-nav-item:hover { background: var(--bg-elevated); }
+.admin-nav-item.active {
+  background: var(--bg-elevated);
+  border-color: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+}
+.admin-nav-item.disabled { color: var(--text-dim); opacity: 0.5; cursor: default; }
+.admin-main { flex: 1; min-width: 0; }
+.admin-main h1 { font-size: 28px; margin: 0 0 8px; }
+
+.field-hint { margin: 6px 0 0; font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+.field-hint code { font-size: 11.5px; }
+
+@media (max-width: 760px) {
+  .admin-shell { flex-direction: column; gap: 16px; }
+  .admin-nav { width: 100%; position: static; }
+  .admin-nav nav { flex-direction: row; flex-wrap: wrap; }
+}
+
+/* --- Admin prompt editor --- */
+.settings-link { text-decoration: none; display: block; transition: border-color 0.15s, background 0.15s; }
+.settings-link:hover { border-color: var(--accent-dim); background: var(--bg-elevated); }
+
+.prompt-card { margin-bottom: 20px; }
+.prompt-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 14px;
+}
+.prompt-title { margin: 0 0 2px; font-size: 16px; color: var(--accent); }
+.prompt-key { margin: 0; }
+.prompt-key code { font-size: 12px; color: var(--text-dim); }
+.prompt-meta { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.prompt-editor {
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 14px;
+  outline: none;
+  tab-size: 2;
+}
+.prompt-editor:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(57, 255, 136, 0.12); }
+.prompt-actions { margin-top: 12px; display: flex; justify-content: flex-end; }
+
+/* --- Final mapping table --- */
+.final-table td { vertical-align: top; }
+.final-table .desc-cell { color: var(--text-dim); max-width: 300px; font-size: 12.5px; }
+.map-line { margin-bottom: 4px; }
+.map-line:last-child { margin-bottom: 0; }
+.mono-id {
+  font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+  font-weight: 700;
+  color: var(--accent);
+  font-size: 12.5px;
+}
+
 .hint {
   margin-top: 18px;
   font-size: 12px;

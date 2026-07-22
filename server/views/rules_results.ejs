@@ -23,6 +23,71 @@
     <h1>Technique Mapping Results</h1>
     <p class="lead"><%= job.filename %> &middot; <%= job.total_rows %> rules processed</p>
 
+    <h2 class="section-title">Final Mapping</h2>
+    <div class="card table-card">
+      <table class="data-table final-table">
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th>Description</th>
+            <th>Analytic mapping</th>
+            <th>Technique mapping</th>
+            <th>QA</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% finalMappings.forEach(function(m) { %>
+            <tr>
+              <td><strong><%= m.ruleName %></strong></td>
+              <td class="desc-cell"><%= m.description || '' %></td>
+              <td>
+                <% if (m.selections.length === 0) { %>
+                  <span class="dim">&mdash;</span>
+                <% } else { %>
+                  <% m.selections.forEach(function(s) { %>
+                    <div class="map-line"><span class="mono-id"><%= s.analyticId %></span> <span class="dim"><%= s.analyticName %></span></div>
+                  <% }); %>
+                <% } %>
+              </td>
+              <td>
+                <% if (m.selections.length === 0) { %>
+                  <span class="state-badge state-partial">Needs review</span>
+                <% } else { %>
+                  <% m.selections.forEach(function(s) { %>
+                    <div class="map-line"><%= s.techniqueName %> <span class="dim">(<%= s.techniqueId %>)</span><% if (s.confidence !== null && s.confidence !== undefined) { %> <span class="dim">· <%= Math.round(s.confidence * 100) %>%</span><% } %></div>
+                  <% }); %>
+                <% } %>
+              </td>
+              <td>
+                <% if (!m.qa) { %>
+                  <span class="dim">&mdash;</span>
+                <% } else if (m.qa.overall === 'pass') { %>
+                  <span class="state-badge state-covered">Pass</span>
+                <% } else if (m.qa.overall === 'fail') { %>
+                  <span class="state-badge state-blind">Fail</span>
+                <% } else { %>
+                  <span class="state-badge state-partial">—</span>
+                <% } %>
+              </td>
+            </tr>
+            <% if (m.qa && m.qa.overall === 'fail') { %>
+              <tr>
+                <td></td>
+                <td colspan="4" class="dim" style="padding-top:0;">
+                  <div style="max-width: 760px;">
+                    <em>QA flags:</em>
+                    <% (m.qa.checks || []).filter(function(c){ return c && !c.pass; }).forEach(function(c) { %>
+                      <div><code><%= c.id %></code> — <%= c.detail %></div>
+                    <% }); %>
+                  </div>
+                </td>
+              </tr>
+            <% } %>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
     <h2 class="section-title">Pipeline Inspector</h2>
     <div class="card">
       <div class="field" style="max-width: 480px;">

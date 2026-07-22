@@ -1,0 +1,9 @@
+<aside class="admin-nav">
+  <div class="admin-nav-title">Settings</div>
+  <nav>
+    <a href="/admin/prompts" class="admin-nav-item <%= active === 'prompts' ? 'active' : '' %>">Agent Prompts</a>
+    <a href="/admin/llm" class="admin-nav-item <%= active === 'llm' ? 'active' : '' %>">LLM Provider</a>
+    <span class="admin-nav-item disabled">User Management</span>
+    <span class="admin-nav-item disabled">Database</span>
+  </nav>
+</aside>

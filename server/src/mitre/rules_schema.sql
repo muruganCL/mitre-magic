@@ -60,6 +60,33 @@ ALTER TABLE rules ADD COLUMN IF NOT EXISTS pipeline_debug JSONB;
 ALTER TABLE rules ADD COLUMN IF NOT EXISTS detection_profile JSONB;
 CREATE INDEX IF NOT EXISTS idx_rules_detection_profile ON rules USING gin (detection_profile jsonb_path_ops);
 
+-- QA / compliance checker output for the rule's final mapping (checks + overall pass/fail).
+ALTER TABLE rules ADD COLUMN IF NOT EXISTS qa_result JSONB;
+
+-- Editable, versioned prompts for the LLM-backed agents. One row per version; exactly one
+-- is_active row per agent_key is the prompt actually used at runtime. Admins edit these in the
+-- UI; every edit creates a new version so nothing is overwritten (audit-friendly).
+CREATE TABLE IF NOT EXISTS prompt_templates (
+  id SERIAL PRIMARY KEY,
+  agent_key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  updated_by TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_active ON prompt_templates (agent_key, is_active);
+
+-- Runtime-adjustable app settings (LLM model, base URL, API key) editable in the admin UI.
+-- Values here override the corresponding environment variables when present.
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_by TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE INDEX IF NOT EXISTS idx_rules_job ON rules(job_id);
 CREATE INDEX IF NOT EXISTS idx_rtm_rule ON rule_technique_matches(rule_id);
 CREATE INDEX IF NOT EXISTS idx_rtm_technique ON rule_technique_matches(technique_id);

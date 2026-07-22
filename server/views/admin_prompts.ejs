@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Prompts · Mitre Agent</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="/rules/upload">Mitre Agent</a>
+    <div class="right">
+      <span class="badge"><%= user.role %></span>
+      <a href="/" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">Back to app</a>
+      <form class="inline" method="POST" action="/logout">
+        <button class="btn btn-ghost" type="submit">Log out</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="admin-shell">
+    <%- include('partials/admin_nav', { active: 'prompts' }) %>
+    <main class="admin-main">
+      <h1>Agent Prompts</h1>
+      <p class="lead">Review and edit the system prompt that drives each LLM-backed agent. Saving creates a new version and activates it immediately &mdash; the previous version is kept.</p>
+
+      <% if (saved && saved !== 'empty') { %>
+        <div class="ok-banner">Saved. The new prompt version is now live for the next run.</div>
+      <% } else if (saved === 'empty') { %>
+        <div class="error-banner">A prompt can’t be empty — nothing was saved.</div>
+      <% } %>
+
+      <% prompts.forEach(function(p) { %>
+        <div class="card prompt-card">
+          <div class="prompt-head">
+            <div>
+              <h3 class="prompt-title"><%= p.title %></h3>
+              <p class="prompt-key"><code><%= p.agentKey %></code></p>
+            </div>
+            <div class="prompt-meta">
+              <span class="badge">v<%= p.version %></span>
+              <% if (p.updated_at) { %>
+                <span class="dim">edited by <%= p.updated_by %></span>
+              <% } else { %>
+                <span class="dim">default</span>
+              <% } %>
+            </div>
+          </div>
+          <form method="POST" action="/admin/prompts/<%= p.agentKey %>">
+            <textarea class="prompt-editor" name="body" spellcheck="false"><%= p.body %></textarea>
+            <div class="prompt-actions">
+              <button class="btn" type="submit" style="width:auto; padding:9px 20px;">Save new version</button>
+            </div>
+          </form>
+        </div>
+      <% }); %>
+    </main>
+  </div>
+</body>
+</html>

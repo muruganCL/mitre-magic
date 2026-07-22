@@ -1,6 +1,6 @@
 const { pool } = require('../db');
 const { matchRule } = require('./match');
-const { extractProfile, reasonAboutRule } = require('./llm');
+const { extractProfile, reasonAboutRule, runQa } = require('./llm');
 
 // Aggregate raw (analytic, technique) matches for one rule up to one row per technique.
 // bestScore is the technique's top score (drives candidate ranking); the REPRESENTATIVE
@@ -139,10 +139,30 @@ async function processJob(jobId) {
         );
       }
 
-      await pool.query('UPDATE rules SET detected_language=$1, pipeline_debug=$2, detection_profile=$3 WHERE id=$4', [
+      // QA agent: independent check of the final mapping against the source rule. Runs even
+      // when nothing was selected (it confirms the needs_review path was taken correctly).
+      let qaResult = null;
+      try {
+        const qaSelections = verdict.selections.map((s) => {
+          const entry = byTechnique.get(s.technique_id);
+          return {
+            technique_id: s.technique_id,
+            technique_name: entry ? entry.techniqueName : undefined,
+            analytic_id: entry ? entry.bestAnalytic : undefined,
+            confidence: s.confidence,
+            rationale: s.rationale,
+          };
+        });
+        qaResult = await runQa(rule, llmProfile, qaSelections);
+      } catch (qaErr) {
+        qaResult = { checks: [], overall: 'error', error: qaErr.message };
+      }
+
+      await pool.query('UPDATE rules SET detected_language=$1, pipeline_debug=$2, detection_profile=$3, qa_result=$4 WHERE id=$5', [
         detectedLanguage,
         JSON.stringify(pipelineDebug),
         llmProfile ? JSON.stringify(llmProfile) : null,
+        qaResult ? JSON.stringify(qaResult) : null,
         rule.id,
       ]);
     } catch (err) {

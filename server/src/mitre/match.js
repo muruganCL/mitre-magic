@@ -219,7 +219,9 @@ async function searchForToken(tok, ruleText, platforms) {
   if (tok.type === 'datamodel' || tok.type === 'concept' || tok.type === 'telemetry')
     return searchByConceptToken(tok.value, ruleText, platforms);
   if (tok.type === 'artifact') return searchByArtifactToken(tok.value, ruleText, platforms);
-  if (tok.type === 'concept-unknown') return []; // seen, but no dictionary entry to search on
+  // Seen and recorded for the audit trail, but no searchable log source: unmapped CrowdStrike
+  // events, filter/allow-list macros, and macros whose name gave no inference.
+  if (tok.type === 'concept-unknown' || tok.type === 'macro-filter' || tok.type === 'macro-unknown') return [];
   return searchBySourceToken(tok.value, ruleText, platforms);
 }
 

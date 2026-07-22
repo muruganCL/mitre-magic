@@ -125,7 +125,45 @@ router.get('/rules/upload/:jobId/results', requireAuth, async (req, res) => {
     [req.params.jobId]
   );
 
-  res.render('rules_results', { user: req.session.user, job, rows, coverage, pipelines });
+  // Final mapping: one entry per rule with its rule name, description, the analytic(s) and
+  // technique(s) the pipeline actually selected, and the QA verdict.
+  const { rows: finalRaw } = await pool.query(
+    `SELECT r.id AS rule_id, r.rule_name, r.description, r.qa_result,
+            rtm.technique_id, t.name AS technique_name, rtm.analytic_id, a.name AS analytic_name,
+            rtm.llm_confidence, rtm.needs_review
+     FROM rules r
+     LEFT JOIN rule_technique_matches rtm ON rtm.rule_id = r.id AND rtm.llm_selected = true
+     LEFT JOIN mitre_techniques t ON t.id = rtm.technique_id
+     LEFT JOIN mitre_analytics a ON a.id = rtm.analytic_id
+     WHERE r.job_id = $1
+     ORDER BY r.id, rtm.llm_confidence DESC NULLS LAST`,
+    [req.params.jobId]
+  );
+
+  const finalById = new Map();
+  for (const row of finalRaw) {
+    if (!finalById.has(row.rule_id)) {
+      finalById.set(row.rule_id, {
+        ruleId: row.rule_id,
+        ruleName: row.rule_name,
+        description: row.description,
+        qa: row.qa_result || null,
+        selections: [],
+      });
+    }
+    if (row.technique_id) {
+      finalById.get(row.rule_id).selections.push({
+        techniqueId: row.technique_id,
+        techniqueName: row.technique_name,
+        analyticId: row.analytic_id,
+        analyticName: row.analytic_name,
+        confidence: row.llm_confidence,
+      });
+    }
+  }
+  const finalMappings = [...finalById.values()];
+
+  res.render('rules_results', { user: req.session.user, job, rows, coverage, pipelines, finalMappings });
 });
 
 module.exports = router;

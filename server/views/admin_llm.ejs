@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM Provider · Mitre Agent</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="/rules/upload">Mitre Agent</a>
+    <div class="right">
+      <span class="badge"><%= user.role %></span>
+      <a href="/" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">Back to app</a>
+      <form class="inline" method="POST" action="/logout">
+        <button class="btn btn-ghost" type="submit">Log out</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="admin-shell">
+    <%- include('partials/admin_nav', { active: 'llm' }) %>
+    <main class="admin-main">
+      <h1>LLM Provider</h1>
+      <p class="lead">The model, gateway and API key used for every LLM-backed agent. Values set here override the server’s environment configuration.</p>
+
+      <% if (saved) { %>
+        <div class="ok-banner">Saved. New LLM settings apply to the next run.</div>
+      <% } %>
+
+      <div class="card">
+        <form method="POST" action="/admin/llm">
+          <div class="field">
+            <label for="model">Model</label>
+            <input type="text" id="model" name="model" value="<%= cfg.model %>" autocomplete="off" />
+            <p class="field-hint">Currently in use from <%= cfg.modelSource === 'ui' ? 'this setting' : 'environment' %>. e.g. <code>claude-opus-4-8</code>, <code>claude-sonnet-5</code>.</p>
+          </div>
+
+          <div class="field">
+            <label for="base_url">Gateway base URL</label>
+            <input type="text" id="base_url" name="base_url" value="<%= cfg.baseUrl %>" autocomplete="off" />
+            <p class="field-hint">Source: <%= cfg.baseUrlSource === 'ui' ? 'this setting' : 'environment' %>.</p>
+          </div>
+
+          <div class="field">
+            <label for="api_key">API key</label>
+            <input type="password" id="api_key" name="api_key" placeholder="<%= maskedKey ? 'Current: ' + maskedKey + ' — leave blank to keep' : 'Not set — enter a key' %>" autocomplete="off" />
+            <p class="field-hint">
+              <% if (cfg.keySource === 'ui') { %>
+                A key is set in the UI (<%= maskedKey %>). Leave blank to keep it, or enter a new one to replace it.
+              <% } else if (cfg.keySource === 'env') { %>
+                Currently using the key from the server environment (<%= maskedKey %>). Enter a key here to override it.
+              <% } else { %>
+                No key configured. Agents will not run until a key is set.
+              <% } %>
+              The key is stored in the local database and never shown in full.
+            </p>
+          </div>
+
+          <div class="prompt-actions">
+            <button class="btn" type="submit" style="width:auto; padding:9px 20px;">Save settings</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

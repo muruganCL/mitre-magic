@@ -1,6 +1,5 @@
-const PIX_BASE_URL = process.env.PIX_BASE_URL || 'https://pix.positka.net/api/v1';
-const PIX_API_KEY = process.env.PIX_API_KEY;
-const PIX_MODEL = process.env.PIX_MODEL || 'claude-opus-4-5';
+const { getActivePrompt } = require('./promptStore');
+const { getLlmConfig } = require('./settingsStore');
 
 function stripCodeFences(text) {
   return text
@@ -10,18 +9,21 @@ function stripCodeFences(text) {
     .replace(/```\s*$/, '');
 }
 
-// Shared Pix call. Returns { ok, data } or { ok:false, error }. The system prompt is passed
-// per-call but is stable per task, so the gateway caches its prefix (cache:true).
+// Shared Pix call. Returns { ok, data } or { ok:false, error }. The model / gateway / API key
+// are read from the runtime settings (admin-editable in the UI) at call time, falling back to
+// env vars. The system prompt is passed per-call but stable per task, so the gateway caches its
+// prefix (cache:true).
 async function callPix(systemPrompt, userContent) {
-  if (!PIX_API_KEY) return { ok: false, error: 'PIX_API_KEY not configured' };
+  const cfg = await getLlmConfig();
+  if (!cfg.apiKey) return { ok: false, error: 'LLM API key not configured (set it in Admin → LLM Provider)' };
 
   let res;
   try {
-    res = await fetch(`${PIX_BASE_URL}/chat/completions`, {
+    res = await fetch(`${cfg.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${PIX_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: PIX_MODEL,
+        model: cfg.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent },
@@ -52,27 +54,9 @@ async function callPix(systemPrompt, userContent) {
 // This runs BEFORE search and its terms drive the search -- the point is to translate
 // vendor-specific query syntax (Splunk data models, CrowdStrike event names) into the
 // generic behavioral/telemetry vocabulary ATT&CK actually uses, so keyword search over the
-// ATT&CK corpus lands on the right techniques.
+// ATT&CK corpus lands on the right techniques. The system prompt is loaded from the editable
+// prompt registry (admins can change it in the UI without a code change).
 // ---------------------------------------------------------------------------
-const PROFILE_SYSTEM_PROMPT = `You are a detection-engineering assistant. Given a SIEM detection rule (name, description, query, and declared platforms), extract a concise, normalized "detection profile" describing WHAT the rule detects, independent of vendor-specific query syntax. This profile is used to search the MITRE ATT&CK knowledge base, so use ATT&CK-aligned language.
-
-Respond with ONLY valid JSON, no markdown fences, no prose outside the JSON, in exactly this shape:
-{
-  "behavior": ["short ATT&CK-style phrase describing an adversary behavior the rule detects", ...],
-  "entities": { "<entity_type>": "<normalized entity>" },
-  "telemetry": ["normalized telemetry/log source category", ...],
-  "platforms": ["platform the behavior applies to"],
-  "analytic_intent": "one sentence stating what the rule is trying to detect"
-}
-
-Guidance:
-- behavior: 1-5 items, phrased in ATT&CK terms (e.g. "Authentication using expired account", "Use of default credentials", "Process injection via remote thread creation"), NOT the rule's literal field names. Describe the adversary behavior, not the query mechanics.
-- entities: the key security objects involved, normalized (e.g. {"identity": "User Account", "process": "powershell.exe"}). Omit if none are clear.
-- telemetry: translate vendor telemetry (Splunk data models like Authentication/Identity_Management, CrowdStrike event_simpleName) into generic categories such as "Authentication Logs", "Identity Provider Logs", "Process Creation Logs", "Network Connection Logs".
-- platforms: use MITRE platform names where possible (Windows, Linux, macOS, Identity Provider, SaaS, IaaS, Office Suite, Containers, Network Devices, ESXi).
-- analytic_intent: a single crisp sentence.
-- Do not invent behaviors the rule does not support. Keep everything concise.`;
-
 function asStringArray(v) {
   if (!Array.isArray(v)) return [];
   return v.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim());
@@ -90,7 +74,8 @@ async function extractProfile(rule) {
     2
   );
 
-  const result = await callPix(PROFILE_SYSTEM_PROMPT, userContent);
+  const systemPrompt = await getActivePrompt('detection_profile');
+  const result = await callPix(systemPrompt, userContent);
   if (!result.ok) {
     return { profile: null, error: result.error };
   }
@@ -107,32 +92,8 @@ async function extractProfile(rule) {
 }
 
 // ---------------------------------------------------------------------------
-// Stage 5: adjudicate the structurally-ranked candidates.
+// Stage 4: adjudicate the structurally-ranked candidates. System prompt from the registry.
 // ---------------------------------------------------------------------------
-const ADJUDICATION_SYSTEM_PROMPT = `You are a detection-engineering assistant mapping SIEM detection rules to MITRE ATT&CK techniques (Enterprise v19.1).
-
-You will be given a JSON object with:
-- "rule": the rule's name, description, SPL/CQL query, and declared platforms.
-- "detection_profile": a normalized profile of what the rule detects (behaviors, entities, telemetry, intent).
-- "candidates": a short list of technique candidates found by a structural search over MITRE ATT&CK v19.1 analytics. Each includes the analytic that matched, the log source evidence, and a structural_confidence (0-1).
-
-Your job: read the rule's actual detection logic (query + profile) and decide which candidate(s), if any, the rule genuinely detects.
-
-Rules you must follow:
-- Choose ONLY from the candidate technique_id values given to you. Never invent, guess, or recall a technique ID from your own training -- if none of the candidates genuinely fit, return an empty selections array.
-- A rule can legitimately support more than one candidate technique; do not force a single pick if several are truly justified. Equally, do not pick a candidate just because its log source matched -- the rule's actual behavior must plausibly detect that technique.
-- If you are unsure, or the rule's real behavior does not clearly match any candidate well, set needs_review to true and explain why in review_reason. It is better to defer to a human analyst than to force a confident-looking wrong answer.
-- confidence is your own calibrated judgment (0.0-1.0) of how well the rule's actual behavior supports each selected technique.
-
-Respond with ONLY valid JSON, no markdown code fences, no prose outside the JSON, in exactly this shape:
-{
-  "selections": [
-    { "technique_id": "T1234.001", "confidence": 0.0, "rationale": "one or two sentences citing the rule's actual behavior" }
-  ],
-  "needs_review": false,
-  "review_reason": ""
-}`;
-
 async function reasonAboutRule(rule, candidates, profile) {
   if (candidates.length === 0) {
     return { selections: [], needsReview: false, reviewReason: '' };
@@ -160,7 +121,8 @@ async function reasonAboutRule(rule, candidates, profile) {
     2
   );
 
-  const result = await callPix(ADJUDICATION_SYSTEM_PROMPT, userContent);
+  const systemPrompt = await getActivePrompt('adjudication');
+  const result = await callPix(systemPrompt, userContent);
   if (!result.ok) {
     return { selections: [], needsReview: true, reviewReason: result.error };
   }
@@ -178,4 +140,46 @@ async function reasonAboutRule(rule, candidates, profile) {
   };
 }
 
-module.exports = { extractProfile, reasonAboutRule };
+// ---------------------------------------------------------------------------
+// QA agent: checks the final mapping against the source rule. Applies no judgement of its own
+// about correctness -- it verifies the process ran, rationales are present, and every cited
+// piece of evidence actually exists in the source rule (grounding / anti-hallucination check).
+// System prompt from the editable registry.
+// ---------------------------------------------------------------------------
+async function runQa(rule, profile, selections) {
+  const userContent = JSON.stringify(
+    {
+      rule: {
+        rule_name: rule.rule_name,
+        description: rule.description,
+        query: rule.query,
+        applicable_datasource: rule.applicable_datasource,
+      },
+      detection_profile: profile || null,
+      final_mapping: {
+        selections: (selections || []).map((s) => ({
+          technique_id: s.technique_id || s.techniqueId,
+          technique_name: s.technique_name || s.techniqueName,
+          analytic_id: s.analytic_id || s.analyticId,
+          confidence: s.confidence,
+          rationale: s.rationale,
+        })),
+      },
+    },
+    null,
+    2
+  );
+
+  const systemPrompt = await getActivePrompt('qa');
+  const result = await callPix(systemPrompt, userContent);
+  if (!result.ok) {
+    return { checks: [], overall: 'error', error: result.error };
+  }
+
+  const parsed = result.data || {};
+  const checks = Array.isArray(parsed.checks) ? parsed.checks : [];
+  const overall = parsed.overall === 'pass' && checks.every((c) => c && c.pass) ? 'pass' : (checks.length ? 'fail' : 'error');
+  return { checks, overall };
+}
+
+module.exports = { extractProfile, reasonAboutRule, runQa };

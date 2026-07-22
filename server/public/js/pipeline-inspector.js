@@ -55,16 +55,30 @@
     return html || '<p class="dim">Profile was empty.</p>';
   }
 
+  function methodBadge(method) {
+    if (!method) return '';
+    const cls = method === 'inference' ? 'state-partial' : method === 'dictionary' ? 'state-covered' : '';
+    return `<span class="state-badge ${cls}" style="font-size:9.5px; padding:2px 7px;">${esc(method)}</span>`;
+  }
+
   function renderTokens(tokens) {
-    if (!tokens || tokens.length === 0) return '<p class="dim">No sourcetype/EventCode/datamodel/event_simpleName signal found in this query.</p>';
-    return `<div class="token-chips">${tokens
-      .map(
-        (t) =>
-          `<span class="token-chip token-chip-${esc(t.type)}">${esc(t.type)}: ${esc(t.value)}${
-            t.dataset ? ` <span class="dim">(dataset: ${esc(t.dataset)})</span>` : ''
-          }</span>`
-      )
-      .join('')}</div>`;
+    if (!tokens || tokens.length === 0) return '<p class="dim">No sourcetype/EventCode/datamodel/event_simpleName/macro signal found in this query.</p>';
+    const rows = tokens
+      .map((t) => {
+        const note = t.assumption
+          ? `<div class="dim" style="margin-top:3px;"><em>assumption:</em> ${esc(t.assumption)}</div>`
+          : t.dataset
+          ? `<div class="dim" style="margin-top:3px;">dataset hint: ${esc(t.dataset)}</div>`
+          : '';
+        return `<tr>
+          <td><span class="token-chip token-chip-${esc(t.type)}">${esc(t.type)}</span></td>
+          <td><code>${esc(t.value)}</code>${note}</td>
+          <td>${methodBadge(t.method)}</td>
+          <td><code class="dim">${esc(t.evidence || '')}</code></td>
+        </tr>`;
+      })
+      .join('');
+    return `<table class="data-table"><thead><tr><th>Signal</th><th>Value / assumption</th><th>Method</th><th>Evidence in query</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   function renderSignalResults(signalResults) {
