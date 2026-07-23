@@ -220,6 +220,18 @@ a.admin-nav-item:hover { background: var(--bg-elevated); }
 .prompt-editor:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(57, 255, 136, 0.12); }
 .prompt-actions { margin-top: 12px; display: flex; justify-content: flex-end; }
 
+/* --- Prompt comparison --- */
+.compare-controls { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 4px; }
+.compare-controls .field { flex: 1; min-width: 200px; }
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.compare-col { border: 1px solid var(--border); border-radius: 10px; padding: 14px; background: var(--bg-card); }
+.compare-col-head {
+  font-size: 12px; font-weight: 700; color: var(--accent);
+  margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+}
+@media (max-width: 720px) { .compare-grid { grid-template-columns: 1fr; } }
+
 /* --- Final mapping table --- */
 .final-table td { vertical-align: top; }
 .final-table .desc-cell { color: var(--text-dim); max-width: 300px; font-size: 12.5px; }
@@ -522,3 +534,32 @@ form.inline {
   border-color: var(--danger);
   color: var(--danger);
 }
+
+/* --- Raw LLM call (collapsible) --- */
+.raw-llm {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+.raw-llm > summary {
+  cursor: pointer;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+  user-select: none;
+}
+.raw-llm > summary::-webkit-details-marker { display: none; }
+.raw-llm > summary::before { content: "▸ "; color: var(--text-dim); }
+.raw-llm[open] > summary::before { content: "▾ "; }
+.raw-llm-body { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.raw-llm-part span.dim {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.raw-llm-part .query-block { max-height: 260px; }

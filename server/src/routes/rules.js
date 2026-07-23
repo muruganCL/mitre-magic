@@ -120,7 +120,7 @@ router.get('/rules/upload/:jobId/results', requireAuth, async (req, res) => {
   const coverage = await computeCoverage(req.params.jobId);
 
   const { rows: pipelines } = await pool.query(
-    `SELECT id, rule_name, query, detected_language, pipeline_debug
+    `SELECT id, rule_name, query, detected_language, pipeline_debug, qa_result
      FROM rules WHERE job_id = $1 ORDER BY id`,
     [req.params.jobId]
   );

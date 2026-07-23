@@ -180,6 +180,45 @@
     return `${banner}<table class="data-table"><thead><tr><th>Candidate Sent</th><th>Verdict</th><th>Confidence</th><th>Rationale</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
+  // Collapsible raw request/response for one LLM call, so the exact prompt and model output
+  // are inspectable without cluttering the stage.
+  function renderRawLlm(call, label) {
+    if (!call) return '';
+    const usage = call.usage
+      ? ` <span class="dim">· ${call.usage.total_tokens || (call.usage.prompt_tokens || 0) + (call.usage.completion_tokens || 0) || '?'} tokens${
+          call.usage.prompt_tokens_details && call.usage.prompt_tokens_details.cached_tokens
+            ? ', ' + call.usage.prompt_tokens_details.cached_tokens + ' cached'
+            : ''
+        }</span>`
+      : '';
+    return `<details class="raw-llm">
+      <summary>Raw ${esc(label)} LLM call <span class="dim">— ${esc(call.model || '')}</span>${usage}</summary>
+      <div class="raw-llm-body">
+        <div class="raw-llm-part"><span class="dim">System prompt</span><pre class="query-block">${esc(call.systemPrompt || '')}</pre></div>
+        <div class="raw-llm-part"><span class="dim">User message</span><pre class="query-block">${esc(call.userContent || '')}</pre></div>
+        <div class="raw-llm-part"><span class="dim">Model response</span><pre class="query-block">${esc(call.rawResponse || '(none)')}</pre></div>
+      </div>
+    </details>`;
+  }
+
+  function renderQa(qa, call) {
+    let html = '';
+    if (qa && Array.isArray(qa.checks) && qa.checks.length) {
+      const rows = qa.checks
+        .map((c) => `<tr>
+          <td><code>${esc(c.id)}</code></td>
+          <td>${c.pass ? '<span class="state-badge state-covered">Pass</span>' : '<span class="state-badge state-blind">Fail</span>'}</td>
+          <td style="max-width:520px;">${esc(c.detail || '')}</td></tr>`)
+        .join('');
+      html += `<p>Overall: ${qa.overall === 'pass' ? '<span class="state-badge state-covered">Pass</span>' : '<span class="state-badge state-blind">' + esc(qa.overall) + '</span>'}</p>
+        <table class="data-table"><thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody>${rows}</tbody></table>`;
+    } else {
+      html += '<p class="dim">No QA result captured.</p>';
+    }
+    html += renderRawLlm(call, 'QA');
+    return html;
+  }
+
   function render(ruleId) {
     const p = pipelines.find((x) => String(x.id) === String(ruleId));
     if (!p) {
@@ -191,6 +230,7 @@
       container.innerHTML = `<p class="dim">No pipeline data captured for this rule (it may have failed during processing).</p>`;
       return;
     }
+    const calls = dbg.llmCalls || {};
 
     container.innerHTML = `
       <div class="stage-block">
@@ -201,6 +241,7 @@
       <div class="stage-block">
         <p class="stage-block-label">Stage 1 &middot; Detection Profile <span class="dim">(LLM-extracted)</span></p>
         ${renderDetectionProfile(dbg.detectionProfile, dbg.profileError)}
+        ${renderRawLlm(calls.profile, 'Detection Profile')}
       </div>
 
       <div class="stage-block">
@@ -221,6 +262,12 @@
       <div class="stage-block">
         <p class="stage-block-label">Stage 5 &middot; LLM Adjudication</p>
         ${renderLlm(dbg.llm)}
+        ${renderRawLlm(calls.adjudication, 'Adjudication')}
+      </div>
+
+      <div class="stage-block">
+        <p class="stage-block-label">Stage 6 &middot; QA / Compliance Check</p>
+        ${renderQa(p.qa_result, calls.qa)}
       </div>
     `;
   }

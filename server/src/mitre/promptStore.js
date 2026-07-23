@@ -134,6 +134,23 @@ async function listActivePrompts() {
   });
 }
 
+// All versions of a prompt, newest first, for the version picker and comparison harness.
+async function listVersions(agentKey) {
+  const { rows } = await pool.query(
+    'SELECT version, is_active, updated_by, updated_at FROM prompt_templates WHERE agent_key=$1 ORDER BY version DESC',
+    [agentKey]
+  );
+  return rows;
+}
+
+async function getVersionBody(agentKey, version) {
+  const { rows } = await pool.query(
+    'SELECT body FROM prompt_templates WHERE agent_key=$1 AND version=$2 LIMIT 1',
+    [agentKey, version]
+  );
+  return rows[0] ? rows[0].body : null;
+}
+
 // Save an edited prompt as a NEW version: deactivate the current active row, insert the new
 // body as version = max+1 and mark it active. Nothing is overwritten.
 async function saveNewVersion(agentKey, body, updatedBy) {
@@ -163,4 +180,13 @@ async function saveNewVersion(agentKey, body, updatedBy) {
   }
 }
 
-module.exports = { DEFAULT_PROMPTS, AGENT_ORDER, ensureSeeded, getActivePrompt, listActivePrompts, saveNewVersion };
+module.exports = {
+  DEFAULT_PROMPTS,
+  AGENT_ORDER,
+  ensureSeeded,
+  getActivePrompt,
+  listActivePrompts,
+  saveNewVersion,
+  listVersions,
+  getVersionBody,
+};

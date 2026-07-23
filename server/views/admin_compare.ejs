@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compare Prompt Versions · Mitre Agent</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="/rules/upload">Mitre Agent</a>
+    <div class="right">
+      <span class="badge"><%= user.role %></span>
+      <a href="/admin/prompts" style="color: var(--text-dim); text-decoration: none; font-size: 13px;">Prompts</a>
+      <form class="inline" method="POST" action="/logout">
+        <button class="btn btn-ghost" type="submit">Log out</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="admin-shell">
+    <%- include('partials/admin_nav', { active: 'prompts' }) %>
+    <main class="admin-main">
+      <h1>Compare Detection-Profile Prompt Versions</h1>
+      <p class="lead">Run two versions of the Detection Profile prompt against the same sample rules and compare the profiles they produce &mdash; so you can judge a prompt change before making it active. Runs live LLM calls (2 per rule).</p>
+
+      <% if (error) { %><div class="error-banner"><%= error %></div><% } %>
+
+      <div class="card">
+        <form method="POST" action="/admin/prompts/compare">
+          <div class="compare-controls">
+            <div class="field">
+              <label for="version_a">Version A</label>
+              <select id="version_a" name="version_a">
+                <% versions.forEach(function(v) { %>
+                  <option value="<%= v.version %>" <%= v.version === versionA ? 'selected' : '' %>>v<%= v.version %><%= v.is_active ? ' (active)' : '' %> — <%= v.updated_by %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="field">
+              <label for="version_b">Version B</label>
+              <select id="version_b" name="version_b">
+                <% versions.forEach(function(v) { %>
+                  <option value="<%= v.version %>" <%= v.version === versionB ? 'selected' : '' %>>v<%= v.version %><%= v.is_active ? ' (active)' : '' %> — <%= v.updated_by %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="sample_csv">Sample rules <span class="dim">(CSV: rule_name, description, query, applicable_datasource — up to 4 rows)</span></label>
+            <textarea id="sample_csv" name="sample_csv" class="prompt-editor" style="min-height:150px;" spellcheck="false"><%= sampleCsv %></textarea>
+          </div>
+          <div class="prompt-actions">
+            <button class="btn" type="submit" style="width:auto; padding:9px 20px;">Run comparison</button>
+          </div>
+        </form>
+      </div>
+
+      <%
+      function renderProfile(p, err) {
+        if (err) return '<p class="error-banner">' + err + '</p>';
+        if (!p) return '<p class="dim">No profile produced.</p>';
+        var html = '';
+        if (p.analytic_intent) html += '<p style="font-style:italic; margin:0 0 10px;">' + p.analytic_intent + '</p>';
+        function grp(label, arr) {
+          if (!arr || !arr.length) return '';
+          return '<div style="margin-bottom:8px;"><span class="dim" style="text-transform:uppercase;font-size:10px;letter-spacing:0.4px;">' + label + '</span><div class="token-chips" style="margin-top:4px;">' + arr.map(function(x){return '<span class="token-chip">' + x + '</span>';}).join('') + '</div></div>';
+        }
+        html += grp('behavior', p.behavior);
+        html += grp('entities', p.entities ? Object.entries(p.entities).map(function(e){return e[0]+': '+e[1];}) : []);
+        html += grp('telemetry', p.telemetry);
+        html += grp('platforms', p.platforms);
+        return html;
+      }
+      %>
+
+      <% if (results) { %>
+        <h2 class="section-title">Results</h2>
+        <p class="lead" style="font-size:13px;">Version A = <strong>v<%= versionA %></strong> &middot; Version B = <strong>v<%= versionB %></strong></p>
+        <% results.forEach(function(r) { %>
+          <div class="card" style="margin-bottom:18px;">
+            <h3 style="margin:0 0 4px; color:var(--accent); font-size:16px;"><%= r.rule.rule_name %></h3>
+            <p class="dim" style="margin:0 0 14px; font-size:12.5px;"><%= r.rule.description %></p>
+            <div class="compare-grid">
+              <div class="compare-col">
+                <div class="compare-col-head">Version A · v<%= versionA %></div>
+                <%- renderProfile(r.a, r.aError) %>
+              </div>
+              <div class="compare-col">
+                <div class="compare-col-head">Version B · v<%= versionB %></div>
+                <%- renderProfile(r.b, r.bError) %>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+      <% } %>
+    </main>
+  </div>
+</body>
+</html>

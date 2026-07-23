@@ -15,7 +15,11 @@ function stripCodeFences(text) {
 // prefix (cache:true).
 async function callPix(systemPrompt, userContent) {
   const cfg = await getLlmConfig();
-  if (!cfg.apiKey) return { ok: false, error: 'LLM API key not configured (set it in Admin → LLM Provider)' };
+  // meta is returned on every path so the exact prompt sent and raw response are always
+  // available for the audit / reasoning-visibility view. The API key is only in the request
+  // header, never in meta, so nothing secret is captured.
+  const meta = { model: cfg.model, systemPrompt, userContent, rawResponse: null, usage: null };
+  if (!cfg.apiKey) return { ok: false, error: 'LLM API key not configured (set it in Admin → LLM Provider)', meta };
 
   let res;
   try {
@@ -32,20 +36,23 @@ async function callPix(systemPrompt, userContent) {
       }),
     });
   } catch (err) {
-    return { ok: false, error: `LLM call failed: ${err.message}` };
+    return { ok: false, error: `LLM call failed: ${err.message}`, meta };
   }
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    return { ok: false, error: `LLM gateway returned ${res.status}: ${text.slice(0, 200)}` };
+    meta.rawResponse = text.slice(0, 2000);
+    return { ok: false, error: `LLM gateway returned ${res.status}: ${text.slice(0, 200)}`, meta };
   }
 
   const data = await res.json();
   const raw = data.choices?.[0]?.message?.content || '';
+  meta.rawResponse = raw;
+  meta.usage = data.usage || null;
   try {
-    return { ok: true, data: JSON.parse(stripCodeFences(raw)) };
+    return { ok: true, data: JSON.parse(stripCodeFences(raw)), meta };
   } catch (err) {
-    return { ok: false, error: `Could not parse LLM response as JSON: ${raw.slice(0, 200)}` };
+    return { ok: false, error: `Could not parse LLM response as JSON: ${raw.slice(0, 200)}`, meta };
   }
 }
 
@@ -62,7 +69,9 @@ function asStringArray(v) {
   return v.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim());
 }
 
-async function extractProfile(rule) {
+// promptBodyOverride lets the comparison harness run this agent against a specific prompt
+// version instead of the active one; normal pipeline calls omit it and use the active prompt.
+async function extractProfile(rule, promptBodyOverride) {
   const userContent = JSON.stringify(
     {
       rule_name: rule.rule_name,
@@ -74,10 +83,10 @@ async function extractProfile(rule) {
     2
   );
 
-  const systemPrompt = await getActivePrompt('detection_profile');
+  const systemPrompt = promptBodyOverride || (await getActivePrompt('detection_profile'));
   const result = await callPix(systemPrompt, userContent);
   if (!result.ok) {
-    return { profile: null, error: result.error };
+    return { profile: null, error: result.error, llm: result.meta };
   }
 
   const p = result.data || {};
@@ -101,7 +110,7 @@ async function extractProfile(rule) {
     analytic_intent: typeof p.analytic_intent === 'string' ? p.analytic_intent.trim() : '',
     audit,
   };
-  return { profile, error: null };
+  return { profile, error: null, llm: result.meta };
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +146,7 @@ async function reasonAboutRule(rule, candidates, profile) {
   const systemPrompt = await getActivePrompt('adjudication');
   const result = await callPix(systemPrompt, userContent);
   if (!result.ok) {
-    return { selections: [], needsReview: true, reviewReason: result.error };
+    return { selections: [], proposed: [], needsReview: true, reviewReason: result.error, llm: result.meta };
   }
 
   const parsed = result.data || {};
@@ -157,6 +166,7 @@ async function reasonAboutRule(rule, candidates, profile) {
     proposed,
     needsReview: !!parsed.needs_review || (selections.length === 0 && proposed.length === 0),
     reviewReason: parsed.review_reason || (selections.length === 0 && proposed.length === 0 ? 'LLM found no candidate genuinely matched the rule logic.' : ''),
+    llm: result.meta,
   };
 }
 
@@ -193,13 +203,13 @@ async function runQa(rule, profile, selections) {
   const systemPrompt = await getActivePrompt('qa');
   const result = await callPix(systemPrompt, userContent);
   if (!result.ok) {
-    return { checks: [], overall: 'error', error: result.error };
+    return { checks: [], overall: 'error', error: result.error, llm: result.meta };
   }
 
   const parsed = result.data || {};
   const checks = Array.isArray(parsed.checks) ? parsed.checks : [];
   const overall = parsed.overall === 'pass' && checks.every((c) => c && c.pass) ? 'pass' : (checks.length ? 'fail' : 'error');
-  return { checks, overall };
+  return { checks, overall, llm: result.meta };
 }
 
 module.exports = { extractProfile, reasonAboutRule, runQa };

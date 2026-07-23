@@ -45,6 +45,9 @@
               <% } else { %>
                 <span class="dim">default</span>
               <% } %>
+              <% if (p.agentKey === 'detection_profile') { %>
+                <a href="/admin/prompts/compare" style="font-size:12.5px; color:var(--accent); text-decoration:none;">Compare versions →</a>
+              <% } %>
             </div>
           </div>
           <form method="POST" action="/admin/prompts/<%= p.agentKey %>">

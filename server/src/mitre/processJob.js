@@ -82,7 +82,7 @@ async function processJob(jobId) {
       // Stage 1: LLM extracts a normalized, ATT&CK-aligned detection profile. This runs first
       // and its terms drive the search (better relevance) -- see match.js. Null on LLM failure,
       // in which case matchRule falls back to query-only search.
-      const { profile: llmProfile, error: profileError } = await extractProfile(rule);
+      const { profile: llmProfile, error: profileError, llm: profileLlm } = await extractProfile(rule);
 
       const { detectedLanguage, queryFeatures, tokens, signalResults, matches: rawMatches } = await matchRule(rule, llmProfile);
       const byTechnique = aggregateByTechnique(rawMatches, rule.applicable_platforms || []);
@@ -115,6 +115,14 @@ async function processJob(jobId) {
         llm: {
           request: llmCandidates,
           response: verdict,
+        },
+        // Raw request/response for every LLM call, so a reviewer can see exactly what each
+        // agent was asked (system prompt + user message) and what the model returned.
+        llmCalls: {
+          profile: profileLlm || null,
+          adjudication: verdict.llm || null,
+          // qa is filled in below, after the QA agent runs.
+          qa: null,
         },
       };
 
@@ -214,12 +222,14 @@ async function processJob(jobId) {
       } catch (qaErr) {
         qaResult = { checks: [], overall: 'error', error: qaErr.message };
       }
+      if (pipelineDebug && qaResult) pipelineDebug.llmCalls.qa = qaResult.llm || null;
 
       await pool.query('UPDATE rules SET detected_language=$1, pipeline_debug=$2, detection_profile=$3, qa_result=$4 WHERE id=$5', [
         detectedLanguage,
         JSON.stringify(pipelineDebug),
         llmProfile ? JSON.stringify(llmProfile) : null,
-        qaResult ? JSON.stringify(qaResult) : null,
+        // qa_result holds the verdict only; the raw QA prompt/response lives in pipeline_debug.llmCalls.qa.
+        qaResult ? JSON.stringify({ checks: qaResult.checks, overall: qaResult.overall, error: qaResult.error || null }) : null,
         rule.id,
       ]);
     } catch (err) {
