@@ -52,6 +52,24 @@
     html += chipGroup('entities', entityValues);
     html += chipGroup('telemetry', profile.telemetry);
     html += chipGroup('platforms', profile.platforms);
+
+    if (Array.isArray(profile.audit) && profile.audit.length) {
+      const rows = profile.audit
+        .map((a) => {
+          const inferred = /^inferred/i.test(a.evidence || '');
+          return `<tr>
+            <td><span class="dim">${esc(a.field)}</span></td>
+            <td>${esc(a.value)}</td>
+            <td>${inferred ? '<span class="dim"><em>' + esc(a.evidence) + '</em></span>' : '“' + esc(a.evidence) + '”'}</td>
+            <td class="dim">${esc(a.reasoning)}</td>
+          </tr>`;
+        })
+        .join('');
+      html += `<div style="margin-top:14px;">
+        <span class="dim" style="text-transform: uppercase; font-size: 10px; letter-spacing: 0.4px;">Audit — evidence per item</span>
+        <table class="data-table" style="margin-top:6px;"><thead><tr><th>Field</th><th>Value</th><th>Evidence in rule</th><th>Reasoning</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>`;
+    }
     return html || '<p class="dim">Profile was empty.</p>';
   }
 
@@ -120,16 +138,27 @@
       .join('');
   }
 
+  function breakdownCell(b) {
+    if (!b) return '';
+    const parts = [];
+    if (b.base != null) parts.push(`base ${b.base.toFixed(2)}${b.baseReason ? ' <span class="dim">(' + esc(b.baseReason) + ')</span>' : ''}`);
+    if (b.analyticFts) parts.push(`+${b.analyticFts.toFixed(2)} analytic text`);
+    if (b.techniqueFts) parts.push(`+${b.techniqueFts.toFixed(2)} technique text`);
+    if (b.datasourceConsistent === false) parts.push('<span class="dim">off-datasource</span>');
+    return `<div class="dim" style="margin-top:3px; font-size:11.5px;">${parts.join(' · ')}</div>`;
+  }
+
   function renderRankedCandidates(candidates) {
     if (!candidates || candidates.length === 0) return '<p class="dim">No candidates survived to ranking.</p>';
     const rows = candidates
       .map(
         (c) => `<tr><td>${esc(c.techniqueName)} <span class="dim">(${esc(c.techniqueId)})</span></td>
           <td>${esc(c.analyticName)} <span class="dim">(${esc(c.analyticId)})</span></td>
-          <td>${esc(c.matchedLogSource)}</td><td>${(c.platforms || []).join(', ')}</td><td>${pct(c.structuralScore)}</td></tr>`
+          <td>${esc(c.matchedLogSource)}</td><td>${(c.platforms || []).join(', ')}</td>
+          <td>${pct(c.structuralScore)}${breakdownCell(c.scoreBreakdown)}</td></tr>`
       )
       .join('');
-    return `<table class="data-table"><thead><tr><th>Technique</th><th>Analytic</th><th>Log Source</th><th>Platforms</th><th>Structural Score</th></tr></thead><tbody>${rows}</tbody></table>`;
+    return `<table class="data-table"><thead><tr><th>Technique</th><th>Analytic</th><th>Log Source</th><th>Platforms</th><th>Structural Score &amp; breakdown</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   function renderLlm(llm) {

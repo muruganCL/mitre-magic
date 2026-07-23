@@ -58,7 +58,11 @@ async function searchBySourceToken(value, ruleText, platforms) {
               )
               + COALESCE(ts_rank_cd(a.search_vector, mitre_or_tsquery($2)), 0) * 0.2
               + COALESCE(ts_rank_cd(t.search_vector, mitre_or_tsquery($2)), 0) * 0.2
-              AS raw_score
+              AS raw_score,
+              LEAST(GREATEST(similarity(als.log_source_name, $1), CASE WHEN als.log_source_name ILIKE '%' || $1 || '%' THEN 0.5 ELSE 0 END), 0.5) AS base_score,
+              'fuzzy log-source match (capped at 0.5)'::text AS base_reason,
+              COALESCE(ts_rank_cd(a.search_vector, mitre_or_tsquery($2)), 0) * 0.2 AS analytic_fts,
+              COALESCE(ts_rank_cd(t.search_vector, mitre_or_tsquery($2)), 0) * 0.2 AS technique_fts
        FROM mitre_analytic_log_sources als
        JOIN mitre_analytics a ON a.id = als.analytic_id
        JOIN mitre_detection_strategy_analytics dsa ON dsa.analytic_id = a.id
@@ -88,7 +92,11 @@ async function searchByEventCode(value, ruleText, platforms) {
               0.95
               + COALESCE(ts_rank_cd(a.search_vector, mitre_or_tsquery($2)), 0) * 0.05
               + COALESCE(ts_rank_cd(t.search_vector, mitre_or_tsquery($2)), 0) * 0.05
-              AS raw_score
+              AS raw_score,
+              0.95::float AS base_score,
+              'exact event-code / channel match'::text AS base_reason,
+              COALESCE(ts_rank_cd(a.search_vector, mitre_or_tsquery($2)), 0) * 0.05 AS analytic_fts,
+              COALESCE(ts_rank_cd(t.search_vector, mitre_or_tsquery($2)), 0) * 0.05 AS technique_fts
        FROM mitre_analytic_log_sources als
        JOIN mitre_analytics a ON a.id = als.analytic_id
        JOIN mitre_detection_strategy_analytics dsa ON dsa.analytic_id = a.id
@@ -121,7 +129,11 @@ async function searchByConceptToken(value, ruleText, platforms) {
               0.6
               + COALESCE(ts_rank_cd(a.search_vector, mitre_or_tsquery($2)), 0) * 0.25
               + COALESCE(ts_rank_cd(t.search_vector, mitre_or_tsquery($2)), 0) * 0.25
-              AS raw_score
+              AS raw_score,
+              0.6::float AS base_score,
+              'data-component / telemetry concept match'::text AS base_reason,
+              COALESCE(ts_rank_cd(a.search_vector, mitre_or_tsquery($2)), 0) * 0.25 AS analytic_fts,
+              COALESCE(ts_rank_cd(t.search_vector, mitre_or_tsquery($2)), 0) * 0.25 AS technique_fts
        FROM mitre_data_components dc
        JOIN mitre_analytic_log_sources als ON als.data_component_id = dc.id
        JOIN mitre_analytics a ON a.id = als.analytic_id
@@ -175,7 +187,11 @@ async function searchByFreeTextFallback(value, ruleText, platforms) {
        ORDER BY rt.technique_id, rt.t_rank DESC
      )
      SELECT analytic_id, analytic_name, platforms, log_source_name, channel, technique_id, technique_name,
-            LEAST(t_rank * 0.4, 0.4) AS sim
+            LEAST(t_rank * 0.4, 0.4) AS sim,
+            0::float AS base_score,
+            'text-only semantic fallback (no log-source anchor)'::text AS base_reason,
+            0::float AS analytic_fts,
+            LEAST(t_rank * 0.4, 0.4)::float AS technique_fts
      FROM picked
      ORDER BY t_rank DESC
      LIMIT ${RESULT_LIMIT}`,
@@ -196,7 +212,11 @@ async function searchByArtifactToken(value, ruleText, platforms) {
               0.7
               + COALESCE(ts_rank_cd(a.search_vector, mitre_or_tsquery($2)), 0) * 0.15
               + COALESCE(ts_rank_cd(t.search_vector, mitre_or_tsquery($2)), 0) * 0.15
-              AS raw_score
+              AS raw_score,
+              0.7::float AS base_score,
+              'artifact term match in channel'::text AS base_reason,
+              COALESCE(ts_rank_cd(a.search_vector, mitre_or_tsquery($2)), 0) * 0.15 AS analytic_fts,
+              COALESCE(ts_rank_cd(t.search_vector, mitre_or_tsquery($2)), 0) * 0.15 AS technique_fts
        FROM mitre_analytic_log_sources als
        JOIN mitre_analytics a ON a.id = als.analytic_id
        JOIN mitre_detection_strategy_analytics dsa ON dsa.analytic_id = a.id
@@ -297,6 +317,13 @@ async function matchRule(rule, llmProfile) {
           technique_name: row.technique_name,
           matched_log_source: row.log_source_name,
           sim: Number(row.sim),
+          breakdown: {
+            base: row.base_score != null ? Number(row.base_score) : null,
+            baseReason: row.base_reason || null,
+            analyticFts: row.analytic_fts != null ? Number(row.analytic_fts) : 0,
+            techniqueFts: row.technique_fts != null ? Number(row.technique_fts) : 0,
+            matchedBySignal: tok.type,
+          },
         });
       }
     }

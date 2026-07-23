@@ -28,6 +28,7 @@ function aggregateByTechnique(rawMatches, rulePlatforms) {
         bestAnalytic: null,
         bestAnalyticName: null,
         bestLogSource: null,
+        bestBreakdown: null,
         anyInferred: false,
       });
     }
@@ -48,6 +49,7 @@ function aggregateByTechnique(rawMatches, rulePlatforms) {
       entry.bestAnalytic = m.analytic_id;
       entry.bestAnalyticName = m.analytic_name;
       entry.bestLogSource = m.matched_log_source;
+      entry.bestBreakdown = m.breakdown ? { ...m.breakdown, datasourceConsistent: consistent } : null;
     }
     entry.anyInferred = entry.anyInferred || inferred;
   }
@@ -108,6 +110,7 @@ async function processJob(jobId) {
         rankedCandidates: llmCandidates.map((c) => ({
           ...c,
           platforms: [...(byTechnique.get(c.techniqueId)?.platforms || [])],
+          scoreBreakdown: byTechnique.get(c.techniqueId)?.bestBreakdown || null,
         })),
         llm: {
           request: llmCandidates,

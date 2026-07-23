@@ -15,8 +15,13 @@ Respond with ONLY valid JSON, no markdown fences, no prose outside the JSON, in 
   "entities": { "<entity_type>": "<normalized entity>" },
   "telemetry": ["normalized telemetry/log source category", ...],
   "platforms": ["platform the behavior applies to"],
-  "analytic_intent": "one sentence stating what the rule is trying to detect"
+  "analytic_intent": "one sentence stating what the rule is trying to detect",
+  "audit": [
+    { "field": "behavior", "value": "the exact item you output above", "evidence": "the exact phrase from the rule (name, description or query) this is grounded in, quoted verbatim", "reasoning": "one short clause explaining the link" }
+  ]
 }
+
+Audit requirement (mandatory): for EVERY item you place in behavior, telemetry, entities, platforms and analytic_intent, add one entry to "audit" whose "field" is which of those it belongs to, "value" repeats the item exactly, "evidence" quotes the exact text in the rule it is grounded in, and "reasoning" briefly explains the link. If an item is inferred rather than explicitly stated in the rule, set "evidence" to "inferred — not explicitly stated" and explain the inference in "reasoning". Never cite evidence text that does not actually appear in the rule.
 
 Guidance:
 - behavior: 1-5 items, phrased in ATT&CK terms (e.g. "Authentication using expired account", "Use of default credentials", "Process injection via remote thread creation"), NOT the rule's literal field names. Describe the adversary behavior, not the query mechanics.

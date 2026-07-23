@@ -81,12 +81,25 @@ async function extractProfile(rule) {
   }
 
   const p = result.data || {};
+  // Per-field provenance: each entry states which profile field it belongs to, the value, the
+  // exact rule text it is grounded in, and the reasoning. Kept even if partial.
+  const audit = Array.isArray(p.audit)
+    ? p.audit
+        .filter((a) => a && typeof a === 'object')
+        .map((a) => ({
+          field: typeof a.field === 'string' ? a.field : '',
+          value: typeof a.value === 'string' ? a.value : '',
+          evidence: typeof a.evidence === 'string' ? a.evidence : '',
+          reasoning: typeof a.reasoning === 'string' ? a.reasoning : '',
+        }))
+    : [];
   const profile = {
     behavior: asStringArray(p.behavior),
     entities: p.entities && typeof p.entities === 'object' && !Array.isArray(p.entities) ? p.entities : {},
     telemetry: asStringArray(p.telemetry),
     platforms: asStringArray(p.platforms),
     analytic_intent: typeof p.analytic_intent === 'string' ? p.analytic_intent.trim() : '',
+    audit,
   };
   return { profile, error: null };
 }
