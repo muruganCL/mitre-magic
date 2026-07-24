@@ -32,7 +32,7 @@ async function callPix(systemPrompt, userContent) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent },
         ],
-        cache: true,
+        cache: cfg.cacheEnabled,
       }),
     });
   } catch (err) {

@@ -37,6 +37,8 @@ router.post('/admin/llm', requireAdmin, async (req, res) => {
   if (baseUrl) await setSetting('pix_base_url', baseUrl, by);
   // Only overwrite the key when a new value is actually entered; blank means "keep current".
   if (apiKey) await setSetting('pix_api_key', apiKey, by);
+  // Checkbox: present in the body only when checked, so its absence means "off".
+  await setSetting('pix_cache_enabled', req.body.cache_enabled ? 'true' : 'false', by);
 
   res.redirect('/admin/llm?saved=1');
 });

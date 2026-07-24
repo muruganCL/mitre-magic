@@ -21,16 +21,21 @@ async function setSetting(key, value, updatedBy) {
 // Effective LLM config: DB setting first, then env var, then a sane default. `keySource`
 // records where the API key came from so the UI can show it without revealing the value.
 async function getLlmConfig() {
-  const [dbKey, dbModel, dbBase] = await Promise.all([
+  const [dbKey, dbModel, dbBase, dbCache] = await Promise.all([
     getSetting('pix_api_key'),
     getSetting('pix_model'),
     getSetting('pix_base_url'),
+    getSetting('pix_cache_enabled'),
   ]);
   const apiKey = dbKey || process.env.PIX_API_KEY || null;
+  // Prompt caching defaults ON (the system prompts are large and stable per agent, so caching
+  // the prefix cuts cost/latency substantially). Admin can turn it off in the UI.
+  const cacheEnabled = dbCache === null ? true : dbCache === 'true';
   return {
     apiKey,
     model: dbModel || process.env.PIX_MODEL || 'claude-opus-4-8',
     baseUrl: dbBase || process.env.PIX_BASE_URL || 'https://pix.positka.net/api/v1',
+    cacheEnabled,
     keySource: dbKey ? 'ui' : process.env.PIX_API_KEY ? 'env' : 'none',
     modelSource: dbModel ? 'ui' : 'env',
     baseUrlSource: dbBase ? 'ui' : 'env',

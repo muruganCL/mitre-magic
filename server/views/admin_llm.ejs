@@ -58,6 +58,16 @@
             </p>
           </div>
 
+          <div class="field">
+            <label>Prompt caching</label>
+            <label class="toggle">
+              <input type="checkbox" id="cache_enabled" name="cache_enabled" value="on" <%= cfg.cacheEnabled ? 'checked' : '' %> />
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+              <span class="toggle-text" id="cache_label"><%= cfg.cacheEnabled ? 'On' : 'Off' %></span>
+            </label>
+            <p class="field-hint">Caches the large, stable system prompt prefix at the gateway (~10% cost on cache hits, ~5-min window). Recommended on. Turn off only for debugging or if the gateway mis-caches.</p>
+          </div>
+
           <div class="prompt-actions">
             <button class="btn" type="submit" style="width:auto; padding:9px 20px;">Save settings</button>
           </div>
@@ -65,5 +75,12 @@
       </div>
     </main>
   </div>
+  <script>
+    (function () {
+      var cb = document.getElementById('cache_enabled');
+      var lbl = document.getElementById('cache_label');
+      if (cb && lbl) cb.addEventListener('change', function () { lbl.textContent = cb.checked ? 'On' : 'Off'; });
+    })();
+  </script>
 </body>
 </html>
