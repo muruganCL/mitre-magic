@@ -48,6 +48,16 @@
         profile.analytic_intent
       )}</div></div>`;
     }
+    if (profile.queryLogic && profile.queryLogic.implementsDescribedBehavior !== null) {
+      const ok = profile.queryLogic.implementsDescribedBehavior;
+      html += `<div class="stage-block" style="margin-top:0; padding-top:0; border-top:none; margin-bottom:12px;">
+        <span class="dim" style="text-transform: uppercase; font-size: 10px; letter-spacing: 0.4px;">query logic</span>
+        <div style="margin-top:4px;">
+          <span class="state-badge ${ok ? 'state-covered' : 'state-blind'}">${ok ? 'Implements described behavior' : 'Does not implement described behavior'}</span>
+          ${profile.queryLogic.assessment ? `<div class="dim" style="margin-top:6px;">${esc(profile.queryLogic.assessment)}</div>` : ''}
+        </div>
+      </div>`;
+    }
     html += chipGroup('behavior', profile.behavior);
     html += chipGroup('entities', entityValues);
     html += chipGroup('telemetry', profile.telemetry);
@@ -137,6 +147,49 @@
       })
       .join('');
   }
+
+  // Static explanations of the Stage 3 / Stage 4 scoring logic, shown inline so a reviewer can
+  // see why a candidate scored the way it did without reading match.js. Kept in sync by hand
+  // with the base scores / weights in server/src/mitre/match.js -- update both together.
+  const STAGE3_SCORING_NOTE = `
+    <div class="scoring-note">
+      <strong>How Stage 3 scores are computed.</strong> Each signal type (the "Token" rows below) is a different
+      kind of evidence linking the rule to a technique, and starts from a different base confidence depending on
+      how strong that kind of evidence is on its own. A full-text relevance boost is then added on top, comparing
+      the rule's own wording (name, description, LLM-extracted profile) against each candidate's analytic text and
+      technique text.
+      <ul>
+        <li><strong>eventcode</strong> &mdash; base <strong>95%</strong>. An exact, unambiguous match on a numeric event ID / channel.</li>
+        <li><strong>behavior</strong> &mdash; up to <strong>90%</strong>, scaled by how closely an LLM-extracted behavior phrase
+          (e.g. &ldquo;command and control over non-standard port&rdquo;) matches a technique's own ATT&amp;CK name
+          (e.g. &ldquo;Non-Standard Port&rdquo;), via trigram <code>word_similarity</code>. This is what lets a technique whose
+          name is itself a behavioral description get surfaced even when its analytic text shares little vocabulary with the rule.</li>
+        <li><strong>artifact</strong> &mdash; base <strong>70%</strong>. A specific technical term from the detection profile
+          (e.g. <code>EncodedCommand</code>, <code>Base64</code>) found directly in a log source's channel text.</li>
+        <li><strong>concept / telemetry / datamodel</strong> &mdash; base <strong>35%</strong>, plus up to +25% each from
+          analytic-text and technique-text relevance. Deliberately the lowest base: this signal only proves the technique
+          shares a broad MITRE data component (e.g. &ldquo;Network Traffic Flow&rdquo;) with dozens of others, so real
+          discrimination has to come from the relevance boost or from a more precise signal also matching.</li>
+        <li><strong>source</strong> (fuzzy log-source name) &mdash; up to <strong>50%</strong> from trigram similarity to a
+          known log source name, plus a small relevance nudge.</li>
+      </ul>
+      Scores are capped at 100% for display. Rows marked <span class="dim">(off data source)</span> matched structurally but
+      have no platform overlap with the rule's declared data source and were excluded here; <span class="dim">(orphan kept)</span>
+      means it's a technique's only evidence and was kept anyway (see Stage 4).
+    </div>`;
+
+  const STAGE4_SCORING_NOTE = `
+    <div class="scoring-note">
+      <strong>How Stage 4 ranking works.</strong> Every (technique, analytic) pair scored in Stage 3, across all signals,
+      is collapsed to one representative row per <strong>technique</strong>: whichever analytic scored highest is shown,
+      preferring one whose platform overlaps the rule's declared data source when one exists. If a technique has
+      <strong>no</strong> platform-matching analytic at all, its single best analytic is still kept &mdash; flagged
+      <span class="dim">off-datasource</span> &mdash; but its score is multiplied by <strong>0.85</strong> (an "orphan"
+      penalty) rather than dropped outright, so a genuinely correct but low-coverage technique still reaches the LLM,
+      just ranked slightly lower. Techniques are then sorted by this final score and the top 10 are sent to the LLM for
+      adjudication in Stage 5 &mdash; that cap only bounds prompt size/cost, not which techniques are eligible, since the
+      ranking itself is already meaningful by this point.
+    </div>`;
 
   function breakdownCell(b) {
     if (!b) return '';
@@ -251,11 +304,13 @@
 
       <div class="stage-block">
         <p class="stage-block-label">Stage 3 &middot; Structural Matches (per signal) <span class="dim">(filtered to declared data sources; off-datasource rows excluded unless they're a technique's only evidence)</span></p>
+        ${STAGE3_SCORING_NOTE}
         ${renderSignalResults(dbg.signalResults)}
       </div>
 
       <div class="stage-block">
         <p class="stage-block-label">Stage 4 &middot; Ranked Candidates (sent to LLM)</p>
+        ${STAGE4_SCORING_NOTE}
         ${renderRankedCandidates(dbg.rankedCandidates)}
       </div>
 

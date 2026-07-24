@@ -16,6 +16,10 @@ Respond with ONLY valid JSON, no markdown fences, no prose outside the JSON, in 
   "telemetry": ["normalized telemetry/log source category", ...],
   "platforms": ["platform the behavior applies to"],
   "analytic_intent": "one sentence stating what the rule is trying to detect",
+  "query_logic": {
+    "implements_described_behavior": true,
+    "assessment": "one or two sentences: does the query's actual filtering, thresholding, or conditional logic implement the behavior described above, or is it generic/inert?"
+  },
   "audit": [
     { "field": "behavior", "value": "the exact item you output above", "evidence": "the exact phrase from the rule (name, description or query) this is grounded in, quoted verbatim", "reasoning": "one short clause explaining the link" }
   ]
@@ -29,6 +33,7 @@ Guidance:
 - telemetry: translate vendor telemetry (Splunk data models like Authentication/Identity_Management, CrowdStrike event_simpleName) into generic categories such as "Authentication Logs", "Identity Provider Logs", "Process Creation Logs", "Network Connection Logs".
 - platforms: use MITRE platform names where possible (Windows, Linux, macOS, Identity Provider, SaaS, IaaS, Office Suite, Containers, Network Devices, ESXi).
 - analytic_intent: a single crisp sentence.
+- query_logic: judge the QUERY itself, independent of what the name/description claims. Look for real filtering (where/eval conditions), thresholds, specific event codes, process names, or statistical logic that would actually distinguish the claimed behavior from a generic baseline. A bare stats/tstats count, or an unfiltered search with no condition, threshold, or specific event selector, does NOT implement any particular behavior no matter how the rule is named -- set implements_described_behavior to false and say so plainly. Do not let a well-written description talk you into true here; judge only what the query's syntax actually does.
 - Do not invent behaviors the rule does not support. Keep everything concise.`,
   },
 
@@ -46,6 +51,7 @@ Your job: read the rule's actual detection logic (query + profile) and decide wh
 Rules you must follow:
 - Choose ONLY from the candidate technique_id values given to you. Never invent, guess, or recall a technique ID from your own training -- if none of the candidates genuinely fit, return an empty selections array.
 - A rule can legitimately support more than one candidate technique; do not force a single pick if several are truly justified. Equally, do not pick a candidate just because its log source matched -- the rule's actual behavior must plausibly detect that technique.
+- Trust the query over the description. detection_profile.query_logic is an independent judgment of whether the QUERY's own filtering/threshold/conditional logic actually implements the behavior the rule's name and description claim -- not just whether the prose sounds right. If query_logic.implements_described_behavior is false, the query is generic or inert (e.g. a bare count/stats with no filter or condition) relative to what it claims to detect. In that case do not select any candidate above low confidence on the strength of the description alone: prefer an empty selections array with needs_review true, and state the query/description mismatch plainly in review_reason. Only select above low confidence when the query's own structural elements -- not just its name -- independently support a candidate. Apply this the same way on every rule; do not let one rule's well-written description talk you into a confident pick while an equally weak query on another rule gets refused.
 - If you are unsure, or the rule's real behavior does not clearly match any candidate well, set needs_review to true and explain why in review_reason. It is better to defer to a human analyst than to force a confident-looking wrong answer.
 - confidence is your own calibrated judgment (0.0-1.0) of how well the rule's actual behavior supports each selected technique.
 

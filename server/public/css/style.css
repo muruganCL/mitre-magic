@@ -511,6 +511,31 @@ form.inline {
   color: var(--accent);
 }
 
+.scoring-note {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-dim);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+.scoring-note strong {
+  color: var(--text);
+}
+.scoring-note ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.scoring-note li {
+  margin-bottom: 3px;
+}
+.scoring-note code {
+  font-size: 11px;
+}
+
 .query-block {
   margin: 0;
   padding: 12px;

@@ -102,12 +102,28 @@ async function extractProfile(rule, promptBodyOverride) {
           reasoning: typeof a.reasoning === 'string' ? a.reasoning : '',
         }))
     : [];
+  // Independent read of the QUERY's own logic, separate from the description-derived behavior
+  // above -- a rule's prose can claim anything, but a bare `stats count by user` with no filter,
+  // threshold, or condition doesn't implement any specific behavior no matter what its name
+  // says. Keeping this as its own structured field (rather than leaving it to surface, or not,
+  // inside free-text rationale) is what lets Stage 5 apply it consistently across rules instead
+  // of catching the mismatch in one rule's adjudication and missing it in another's.
+  const rawQueryLogic = p.query_logic && typeof p.query_logic === 'object' ? p.query_logic : null;
+  const queryLogic = rawQueryLogic
+    ? {
+        implementsDescribedBehavior:
+          typeof rawQueryLogic.implements_described_behavior === 'boolean' ? rawQueryLogic.implements_described_behavior : null,
+        assessment: typeof rawQueryLogic.assessment === 'string' ? rawQueryLogic.assessment.trim() : '',
+      }
+    : null;
+
   const profile = {
     behavior: asStringArray(p.behavior),
     entities: p.entities && typeof p.entities === 'object' && !Array.isArray(p.entities) ? p.entities : {},
     telemetry: asStringArray(p.telemetry),
     platforms: asStringArray(p.platforms),
     analytic_intent: typeof p.analytic_intent === 'string' ? p.analytic_intent.trim() : '',
+    queryLogic,
     audit,
   };
   return { profile, error: null, llm: result.meta };
